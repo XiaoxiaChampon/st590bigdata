@@ -1,0 +1,160 @@
+---
+title: 'ST590HW #2'
+author: "Xiaoxia Champon"
+date: "September 5, 2016"
+output: word_document
+---
+## 1:
+### capture-recapture algorithm
+```{r}
+samplesize=100
+populationsize=1000
+x1=sample(populationsize,samplesize)
+x2=sample(populationsize,samplesize)
+ tagged=length(intersect(x1,x2))
+     if (tagged!=0){
+       estpop=samplesize*samplesize/tagged}
+estpop
+```
+###simulation to postulate the effect of sample size and population size
+#####First: create a function that returns to the value of standard deviation relative to populationsize
+```{r}
+function1=function(samplesize,populationsize){
+numMonteCarlo=1e4
+recorded=0
+  for (w in 1:numMonteCarlo){
+     x3=sample(populationsize,samplesize)
+     x4=sample(populationsize,samplesize)
+     tagged=length(intersect(x3,x4))
+     if (tagged!=0){
+       estpop=samplesize*samplesize/tagged
+       recorded[w]=estpop
+     }}
+     hist(recorded,xlim = c(0,10000))
+}
+
+```
+
+
+```{r}
+function1(100,1000)
+function1(300,1000)
+function1(500,1000)
+#### The bigger the sample size is when the population size is the same, the less spread out the estimated population  is. The more acurate the estimator is.
+```
+
+```{r}
+function1(500,5000)
+function1(1600,5000)
+function1(2500,5000)
+####  We can see from the graph that the bigger the population is, the more spread out the estimation is Even the proprotion of the sample size to the population size is the same. The bigger the population is, the less accurate the estimator is.
+```
+
+### Strategies for NCSU IT:
+The equation will be sampleX1*sampleX2/numbers that in both sampleX1&X2
+You could choose to sample users randomly using an instantaneous snapshot of users, logging users over the course of an hour, or over the course of a day. Logging individual users over the course of a day would give the most accurate repsentation of use. However, if the days chosen coincidended with class schedules (ie Mon, Wed, Fri classes) the individual users may be "marked" in both sample sets with bias because they would be more likely to be campus on these days while users who have Tuesday/Thurdsay classes would be missed.
+
+Choosing to sample over the course of an hour on two different days would be easier to do in terms of memory and compuational power, but may be subject to the same bias as above, as well as the bias of when students get into and out of class. Choosing to sample two hours within in the same day would eliminate the day to day variability, but have bias because the same students would likely be on campus and captured in both sample sets.
+
+Choosing an instantaneous snapshot would be the easiest to do. This method would be subject to all the above biases, depending on when and what days they're taken, and would also have the smallest sample size to work with.
+
+##2
+### coding for probability of weighted single observation for unknown N
+```{r}
+x=runif(1)    #randomly generate a single number from uniform distribution and put in the                      reservoir, so the value of x will be between 0 and 1. Only one observation will                be sampled from the stream 
+n=1           # current total number of obeservations
+w=x           #initial weight: the weight of each observation is equal to the value of the                    observation
+probTerm=1e-5
+while (T) {if (runif(1)<=probTerm){break}
+  n=n+1       # increment the number of total observations
+xprop=runif(1)     #new observation 
+w=w+xprop          #sum of all weights from the stream which is the sum of each observation
+if (runif(1)<=(xprop/w)){x=xprop}}   #if the probability is smaller than or equal to the ratio                                       between new observation weight and the total weight,                                           replace x with the new observation
+n             #total number of observation before the code terminate
+x             
+```
+
+### using n=50 to validate probability of weighted single observation
+```{r}
+## generate 100 K random samples with a fixed n
+n=50 ##total population size
+k=1  #sample size
+numMonteCarlo=1e5  ##number of MonteCarlo iterations
+sampleCountMat=matrix(0,nrow=numMonteCarlo,ncol=n)  ##create a matrix with MonteCarlo # of rows, and population number of columns. All values are set to 0.
+for (m in 1:numMonteCarlo){
+  x=1  ##fill the reservoir with the first observation
+  TotalWeight=x  ##The weight of each observation is equal to its value. TotalWeight equals the weight of the first observation at this point.
+  for (j in 2:50){  ##Generate observations that are unique and range from 2 to 50.
+    TotalWeight=TotalWeight+j  ##Add the weight of the new observation to the total
+    if (runif(1)<=j/TotalWeight){x=j}  ##Divide the weight of the new observation (equal to its value) by the TotalWeight to decide if to replace reservoir with new observation
+  }
+  sampleCountMat[m,x]=1  ##set the column that correlates to the sampled oberservation a value of 1
+  if (m%%1000==0){ ##update the table every 1000 iteration
+    print(m)
+    par(mfrow=c(1,2))
+    barplot(apply(sampleCountMat[1:m,],2,sum),col="gray")  ##dispaly histrogram, showing frequency of each observation. Larger valued observations should be sampled more frequently, as their weight is proportional to their value.
+    image(t(sampleCountMat[1:m,])%*%sampleCountMat[1:m,]-diag(apply(sampleCountMat[1:m,],2,sum)))
+  }
+}
+```
+
+## 3 is in word document.
+
+## 4 When Y is not correlated to X, the sample mean will not be biased.
+```{r}
+N=1000
+x=rbinom(n=1000,size=1,p=0.8)
+table(x)         ###From the table we can see 1 occurs 4 times more than 0
+popnpi=rep(1,N)
+popnpi[x==0]=4
+popnpi=popnpi/sum(popnpi) ##we generate a weight that 0 is sampled 4x more than 1
+Y=rnorm(1000,mean=0,sd=50) ##generate random numers for Y (Y is not correlated to X)
+k=40  ##sample size of 40
+mcrep=1000   ##Monte Carlo 1000 times
+YSampleMeans=numeric(mcrep)  ##Vector to store MonteCarlo results
+for (i in 1:mcrep) {
+  ind=sample(N,size=k,replace=F,prob=popnpi) ##Choose indexes to sample based on X sampling probability (found in popnpi)
+  Ysample=Y[ind] ##choose the sample
+  YSampleMeans[i]=mean(Ysample)    ##find the mean of the sample
+}
+mean(Y)
+mean(Ysample)
+hist(YSampleMeans)
+
+```
+
+
+##4 If Y is correlated to X, then the sample mean will be biased and corrected HT estimator will balance the bias.
+
+```{r}
+N=1000
+x=rbinom(n=1000,size=1,p=0.8)
+popnpi=rep(1,N)
+popnpi[x==0]=4
+popnpi=popnpi/sum(popnpi)
+Y=4*x+rnorm(N)
+k=40
+mcrep=1000
+YSampleMeans=numeric(mcrep)
+HTm=numeric(mcrep)
+correctedHT=numeric(mcrep)
+for (i in 1:mcrep) {
+  ind=sample(N,size=k,replace=F,prob=popnpi)
+  Ysample=Y[ind]
+  YSampleMeans[i]=mean(Ysample)
+  HTm[i]=sum(Y[ind]/popnpi[ind])/N
+  correctedHT[i] = sum(Y[ind]/popnpi[ind])/sum(1/popnpi[ind])
+}
+mean(Y)
+mean(Ysample)
+mean(correctedHT)
+mean(HTm)
+hist(YSampleMeans)
+hist(correctedHT)
+
+```
+
+
+
+
+

@@ -1,0 +1,282 @@
+---
+title: "ST590HW4"
+author: "Xiaoxia Champon"
+date: "October 28, 2016"
+output: pdf_document
+---
+#1(a)###LASSO performs better than Ridge.
+```{r }
+require ("lasso2");
+require ("MASS");
+require("pls")
+require(lars)
+library(glmnet)
+library(caret)
+
+ridgeestimator=rep(1,1000)
+lassoestimator=rep(1,1000)
+ridge.threshestimator1=rep(1,1000)
+ridge.threshestimator2=rep(1,1000)
+
+for (i in 1:1000) {
+ t=sample(1:1000,1000)
+ set.seed(t)
+ n=100
+ x1 <- rnorm(n)
+ x2 <- x1+rnorm(n)*0.5
+ x3 <- 0.2*rnorm(n)
+ x4 <- rnorm(n)*3
+ x5 <- rexp(n)
+ x6=runif(n)
+ x7=0.4*rnorm(n)+runif(n)
+ x8=rnorm(n,0,3)
+ x9=x3+rnorm(n,0,.1)
+ x10=x5+runif(n)*.4
+X <- data.frame(cbind(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10))
+test.indices=sample(1:n,20)
+testX=X[test.indices,]
+trainX=X[-test.indices,]
+
+##ridge
+ridge.mod=lm.ridge(x1~.,trainX,lambda=seq(0,500,0.01))
+coefmin=which.min(ridge.mod$GCV)
+coef(ridge.mod)[coefmin,]
+data=cbind(1,as.matrix(testX[,-1]))
+ridge.pred <- data %*% coef(ridge.mod)[coefmin,]
+ridgeestimator[i]=mean((ridge.pred-testX[,-1])^2)
+
+
+##lasso
+trainy=trainX$x1
+trainx=as.matrix(trainX[,-1])
+lassomod=lars(trainx,trainy)
+cvout=cv.lars(trainx,trainy)
+cvmin=cvout$index[which.min(cvout$cv)]
+las.pred=predict(lassomod,testX[,-1],s=cvmin,mode="fraction")
+lassoestimator[i]=mean((las.pred$fit-testX[,1])^2)
+
+
+
+## ridge with thresholding method 1: Find bestlamd, then find tau
+ridge.mod=lm.ridge(x1~.,trainX,lambda=seq(0,500,0.01))
+smallest=which.min(ridge.mod$GCV)
+ridge.fit=lm.ridge(trainX$x1~.,trainX,lambda=as.numeric(names(smallest)))
+betaLamd=coefficients(ridge.fit)[-1]
+objFunc=function(tau){
+  betaLamTau=(abs(betaLamd>=tau))*betaLamd
+  objValue=log((1/n)*sum((trainX$x1-as.matrix(trainX[,-1])%*%as.matrix(betaLamTau))^2))+(log(n)/n)*sum(betaLamTau)
+  return(objValue[1])
+}
+tau=optim(0,objFunc,method="Brent",lower=0,upper=1)$par
+beta_thresh <- as.matrix((abs(betaLamd) >= tau) * betaLamd)
+ridge.threshestimator1[i] = mean((as.matrix(testX$x1) - (as.matrix(testX[,-1]) %*% beta_thresh))^2)
+}
+
+##ridge with threshholding CV  Robert, Drew worked with me together on this part but I didn't figure out why my dimensions are not correct. I'll come back and look at it again.
+ flds <- createFolds(1:n, k = 10, list = TRUE, returnTrain = FALSE)
+ ridgeObjectivethresh <- function(beta, lambda, index){
+    objective = 1/n * sum((X$x1[flds[[index]],] - as.matrix(X[,-1][flds[[index]],]) %*% beta)^2) + lambda * sum(beta^2)
+    return(objective)
+  }
+  
+  lambdas <- rep(seq(0.01,1, length=100), 10)
+  taus <- rep(seq(0.01,1, length=100), each=10)
+  params <- data.frame(cbind(lambdas, taus))
+  params$CVerror <- 0
+  
+  for(j in 1:length(params[,1])){
+      
+      betagrid= array(rep(0, 10*10), c(10, 10))
+      CVError = 0
+      for(e in 1:10){
+        betagrid[e,] = coefficients(lm.ridge(X$x1[flds[[e]],] ~ X[,-1][flds[[e]],], lam=lambdas[j]),data=)[-1]
+        betas = (abs(betagrid[e,]) >= taus[j]) * betagrid[e,]
+        CVError = CVError + sum((X$x1[-flds[[e]],] - X[,-1][-flds[[e]],] %*% betas)^2)/length(X$x1[-flds[[e]],])
+      
+      params[j,3] = CVError
+      }
+  }
+  
+  fin.params <- which.min(params$CVerror)
+  
+  betas.thresh2 = optim(start, ridgeObjective, lambda = params[fin.params,1])$par
+  betas.thresh2 = (abs(betas.thresh2) >= params[fin.params,2]) * betas.thresh2
+  ridge.thresh2.mse[i] = sum((X$x1 - (X[,-1] %*% betas.thresh2))^2)/n
+
+mean(ridgeestimator)
+mean(lassoestimator)
+mean(ridge.threshestimator1)
+mean(ridge.threshestimator2)
+
+```
+
+###(b): In word document.
+
+#2 (a) The sample size of xt is n and the number of predictors is p.
+```{r}
+require ("lasso2");
+require ("MASS");
+require("pls")
+require("lars")
+library(mvtnorm)
+# keep p and n the same, vary c. As c increases, the lowest BIC value increases then decreases, increases as c gets larger.
+c=rep(0,100)
+minbic = rep(0,100)
+for (c in 1:100){
+t=sample(1:100,100)
+set.seed(t)
+k=3
+p = 3*k
+n=100
+sigma = 1
+
+xt = matrix(rnorm(n*p),n,p) 
+xt=scale(xt,T,T)
+betan0=rep(c,2*p/3)
+beta0=rep(0,p-2*p/3)
+beta=matrix(c(betan0,beta0),nrow=p,ncol=1)/sqrt(n)
+
+y = xt%*%beta + sigma*rnorm(n)
+data1=data.frame(cbind(xt,y))
+limFit=lm(y~xt,data=data1)
+summary(limFit)
+
+bHatOLS = coefficients(limFit)[-1];
+
+dMat = as.matrix (data1[,1:p]);
+dMatTilde =dMat %*% diag (bHatOLS);
+
+lassoFit = l1ce (X10~.,data=data1, bound=seq(0.01, 1, length=100));
+bHatTau = coefficients(lassoFit)[,-1] %*% diag(bHatOLS);
+
+## Chose model using BIC
+n = dim(data1)[1];
+lassoDF = apply (abs(bHatTau) > 1e-8, 1, sum);
+lassoBIC = numeric (length(lassoDF));
+for (i in 1:length(lassoDF)){
+  yHat = dMat %*% bHatTau[i,];
+  rss = sum ((yHat - data1$X10)^2);
+  lassoBIC[i] = log (rss) + lassoDF[i]*log(n)/n;
+}
+minbic[c]=min(lassoBIC)
+}
+plot(minbic)
+
+bHatTau[which.min(lassoBIC),]
+index=which(bHatTau[which.min(lassoBIC),]!=0)
+bHatTau[which.min(lassoBIC),][index]
+xtm=data.frame(xt)
+data2=data.frame(cbind(xtm,y))
+lmod=lm(y~X1+X4+X5+X6,data=data2)
+confint(lmod)[-1,]
+
+#keep c and p the same, vary n. The lowest BIC doesn't change that much.
+n=rep(0,100)
+minbic = rep(0,100)
+for (n in 50:150){
+t=sample(1:100,100)
+set.seed(t)
+c=2
+k=3
+p = 3*k
+sigma = 1
+
+xt = matrix(rnorm(n*p),n,p) 
+xt=scale(xt,T,T)
+betan0=rep(c,2*p/3)
+beta0=rep(0,p-2*p/3)
+beta=matrix(c(betan0,beta0),nrow=p,ncol=1)/sqrt(n)
+
+y = xt%*%beta + sigma*rnorm(n)
+data1=data.frame(cbind(xt,y))
+limFit=lm(y~xt,data=data1)
+summary(limFit)
+
+bHatOLS = coefficients(limFit)[-1];
+
+dMat = as.matrix (data1[,1:p]);
+dMatTilde =dMat %*% diag (bHatOLS);
+
+lassoFit = l1ce (X10~.,data=data1, bound=seq(0.01, 1, length=100));
+bHatTau = coefficients(lassoFit)[,-1] %*% diag(bHatOLS);
+
+## Chose model using BIC
+n = dim(data1)[1];
+lassoDF = apply (abs(bHatTau) > 1e-8, 1, sum);
+lassoBIC = numeric (length(lassoDF));
+for (i in 1:length(lassoDF)){
+  yHat = dMat %*% bHatTau[i,];
+  rss = sum ((yHat - data1$X10)^2);
+  lassoBIC[i] = log (rss) + lassoDF[i]*log(n)/n;
+}
+minbic[n]=min(lassoBIC)
+}
+plot(minbic)
+
+bHatTau[which.min(lassoBIC),]
+index=which(bHatTau[which.min(lassoBIC),]!=0)
+bHatTau[which.min(lassoBIC),][index]
+lmod=lm(y~X6,data=data2)
+confint(lmod)[-1,]
+
+
+# keep n and c the same, vary p. The lowest BIC concentrates between 0 and 102. A lot of values are NA.
+p=rep(0,100)
+minbic = rep(0,100)
+for (p in seq(9,306,3)){
+t=sample(1:100,100)
+set.seed(t)
+c=2
+sigma = 1
+n=100
+xt = matrix(rnorm(n*p),n,p) 
+xt=scale(xt,T,T)
+betan0=rep(c,2*p/3)
+beta0=rep(0,p-2*p/3)
+beta=matrix(c(betan0,beta0),nrow=p,ncol=1)/sqrt(n)
+
+y = xt%*%beta + sigma*rnorm(n)
+data1=data.frame(cbind(xt,y))
+limFit=lm(y~xt,data=data1)
+summary(limFit)
+
+bHatOLS = coefficients(limFit)[-1];
+
+dMat = as.matrix (data1[,1:p]);
+dMatTilde =dMat %*% diag (bHatOLS);
+
+lassoFit = l1ce (X10~.,data=data1, bound=seq(0.01, 1, length=100));
+bHatTau = coefficients(lassoFit)[,-1] %*% diag(bHatOLS);
+
+## Chose model using BIC
+n = dim(data1)[1];
+lassoDF = apply (abs(bHatTau) > 1e-8, 1, sum);
+lassoBIC = numeric (length(lassoDF));
+for (i in 1:length(lassoDF)){
+  yHat = dMat %*% bHatTau[i,];
+  rss = sum ((yHat - data1$X10)^2);
+  lassoBIC[i] = log (rss) + lassoDF[i]*log(n)/n;
+}
+minbic[p]=min(lassoBIC)
+}
+plot(minbic)
+lassoBIC
+lassoBIC=lassoBIC[!is.na(lassoBIC)]
+lassoBIC
+bHatTau[which.min(lassoBIC),]
+index=which(bHatTau[which.min(lassoBIC),]!=0)
+bHatTau[which.min(lassoBIC),][index]
+lmod=lm(y~X6,data=data2)
+confint(lmod)[-1,]
+
+
+minbic <- minbic[!is.na(minbic)]
+w=which.min(minbic)
+index=which(bHatTau[which.min(minbic),]!=0)
+bHatTau[w,][index]
+lmod=lm(y~.,data=data2)
+confint(lmod)[-1,]
+
+```
+
+##(b) Bayesian information criterion can help us to identify the better model. The smaller the BIC is, the better the model will be. Through this simulation study, we vary the fixed vector which is the coefficient beta0 as well as the sample size n and the number of the predictors p. This study indicates the signal-to-noise ratio to remain small even the sample size is big. When we keep p and n the same, vary c. As c increases, the lowest BIC value increases then decreases, increases as c gets larger.When we keep c and p the same, vary sample size n. The lowest BIC doesn't change that much.If we keep n and c the same, vary p. The lowest BIC concentrates between 0 and 102. A lot of values are NA. We aslo made inferences based on the model we chose which has the lowest BIC. We find out that the value of c which is the constant of fixed vector beta has a large impact on the results. The confidence interval is extremely wide and the estimate is very unstable.

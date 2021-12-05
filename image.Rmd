@@ -1,0 +1,46 @@
+---
+title: "discussion14"
+author: "Xiaoxia Champon"
+date: "November 25, 2016"
+output: pdf_document
+---
+#5
+```{r include=FALSE}
+data(aatemp,package="faraway")
+str(aatemp)
+```
+##(a) The temp goes up and down and up again. The trend doesn't look linear.
+```{r}
+plot(temp~year,aatemp)
+```
+##(b) The slope of the line is not zero. The main drawback of this modeling is that it will always exclude many plausible functions and if the current model is the wrong form then this results in bias.
+```{r}
+lmod=lm(temp~year,data=aatemp)
+lmodr=lm(temp~1,data=aatemp)
+anova(lmod,lmodr)
+```
+
+##(c) The trend is not linear.
+```{r}
+with(aatemp,{
+  plot(temp~year,col=gray(0.75))
+  f=loess(temp~year)
+  i=order(aatemp)
+  lines(f$x[i],f$fitted[i])
+})
+library(ggplot2)
+ggplot(aatemp,aes(x=year,y=temp))+geom_point(alpha=0.25)+geom_smooth(method="loess")
+```
+##(d)
+```{r}
+library(splines)
+lmod1=lm(temp~bs(year,12),data=aatemp)
+plot(temp~year,col=gray(0.75),data=aatemp)
+lines(predict(lmod1)~year,aatemp,lty=2)
+```
+ 
+##(e) From F-test result, regression spline basis is preferred. Different knots and df can be checked with AIC values for a better fit. However, the amount of noise should be investigated. When there's very little or moderate noise, splines are good. When the amount of noise becomes larger, a simple parametric model should be used.
+```{r}
+anova(lmod,lmod1)
+```
+

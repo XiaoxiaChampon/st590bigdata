@@ -1,0 +1,97 @@
+---
+title: "Champon590HW1"
+author: "Xiaoxia Champon"
+date: "August 28, 2016"
+output: word_document
+---
+
+##Question 1
+###(i)
+```{r}
+x = c(4,1,6,5)
+y = c(3,4,7,1)
+m2 = function(x,y){
+  v=rep(0,length(x))
+  for (i in 1:length(x))
+  {v[i]=max(sum(x[1:i]),sum(y[1:i]))
+  }
+  v}
+m2(x,y)
+
+```
+###(ii)
+```{r}
+m1 = function(x,y){
+  v=rep(0,length(x))
+  i=1
+  while(i<=length(x))
+  {v[i]=max(sum(x[1:i]),sum(y[1:i]))
+  i=i+1}
+  v}
+m1(x,y)
+
+```
+
+###(iii)
+```{r}
+m=function(x,y){
+ v1=cumsum(x)
+ v2=cumsum(y)
+ pmax(v1,v2)}
+m(x,y)
+
+```
+
+##Question 2
+```{r include=FALSE}
+require(ZillowR)
+require(XML)
+require(scales)
+
+
+set_zillow_web_service_id("X1-ZWz1fexuhv6byj_6y17p")
+price=function(address,citystatezip){
+  doc=GetSearchResults(address,citystatezip)$response
+  if (is.null(doc)){
+    print(paste0("Could not find: ", address,",",citystatezip))}
+  else{els=getNodeSet(doc,"//results/result/zestimate/amount")
+  w=xmlValue(els[[1]])
+  print.default(paste0("$", formatC(as.numeric(w), format="f", digits=2, big.mark=",")))}
+}
+price(address = '2114 Bigelow Ave', citystatezip = 'Seattle, WA')
+price(address = '2114 Bird Ave', citystatezip = 'Seattle, WA')
+
+```
+
+## Question 3
+```{r include=FALSE}
+require(MASS)
+data(crabs)
+attach(crabs)
+names(crabs)
+
+```
+
+
+###graphs
+```{r include=FALSE}
+require(ggplot2)
+require(reshape2)
+
+```
+```{r}
+d=melt(crabs[,])
+ggplot(d,aes(x=value))+facet_wrap(~variable,scales="free_x")+geom_histogram()
+
+```
+```{r}
+ggplot(crabs,aes(x=sp,y=FL))+geom_boxplot()
+ggplot(crabs,aes(x=sp,y=RW))+geom_boxplot()
+ggplot(crabs,aes(x=sp,y=CL))+geom_boxplot()
+ggplot(crabs,aes(x=sp,y=CW))+geom_boxplot()
+ggplot(crabs,aes(x=sp,y=BD))+geom_boxplot()
+
+```
+
+It looks like frontal lobe size (mm)(FL) makes a big differece in the mean of the specieces so it appears to be most relevant for predicting crab species. Followed by body depth (mm)(BD)  and then carapace width (mm)(CW).
+

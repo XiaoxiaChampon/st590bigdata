@@ -1,0 +1,123 @@
+---
+title: "practice q learning"
+author: "Xiaoxia Champon"
+date: "October 16, 2016"
+output: pdf_document
+---
+
+```{r }
+library("iqLearn")
+data("bmiData", package = "iqLearn")
+set.seed(1)
+dim(bmiData)
+head(bmiData)
+bmiData$A1 <- ifelse(bmiData$A1 == "MR", 1, ???1)
+bmiData$A2 <- ifelse(bmiData$A2 == "MR", 1, ???1)
+y <- ???100 * (bmiData$month12_BMI -bmiData$baseline_BMI) / bmiData$baseline_BMI
+
+#two stage Q
+lmod=lm(y~gender+race+parent_BMI+month4_BMI+A2+A2 * (parent_BMI + month4_BMI),data=bmiData)
+data1=bmiData[,c(1,2,3,5,8)]
+A21=rep(1,210)
+A2n1=rep(-1,210)
+newdata1=cbind(data1,A21)
+newdatan1=cbind(data1,A2n1)
+lmod1=lm(y~gender+race+parent_BMI+month4_BMI+A2+A2 * (parent_BMI + month4_BMI),data=newdata1)
+lmodn1=lm(y~gender+race+parent_BMI+month4_BMI+A2+A2 * (parent_BMI + month4_BMI),data=newdatan1)
+ymax=pmax(lmod1,lmodn1)
+
+
+
+
+
+
+
+
+
+
+fitIQ2 <- learnIQ2(y~gender + parent_BMI + month4_BMI +A2 * (parent_BMI + month4_BMI), data = bmiData, treatName = "A2",intNames = c("parent_BMI", "month4_BMI"))
+summary(fitIQ2)
+
+s2vars <- bmiData[, c(1, 3, 5)]
+head(s2vars)
+s2ints <- c(2, 3)
+fitIQ2 <- learnIQ2(H2 = s2vars, Y = y, A2 = bmiData$A2, s2ints = s2ints) 
+
+fitIQ2$betaHat20
+fitIQ2$betaHat21
+plot(fitIQ2)
+
+fitIQ1main <- learnIQ1main (~ gender + race + parent_BMI + baseline_BMI +A1 * (gender + parent_BMI), data = bmiData, treatName = "A1",intNames = c("gender", "parent_BMI"), s2object = fitIQ2)
+summary(fitIQ1main)
+
+s1vars <- bmiData[, 1:4]
+head(s1vars)
+s1mainInts <- c(1, 3)
+fitIQ1main <- learnIQ1main(object = fitIQ2, H1Main = s1vars,A1 = bmiData$A1, s1mainInts = s1mainInts)
+
+fitIQ1main$alphaHat0
+fitIQ1main$alphaHat1
+plot(fitIQ1main)
+
+
+
+fitIQ1cm <- learnIQ1cm(~ gender + race + parent_BMI + baseline_BMI +A1 * (gender + parent_BMI + baseline_BMI), data = bmiData,treatName = "A1", intNames = c("gender", "parent_BMI", "baseline_BMI"),s2object = fitIQ2)
+summary(fitIQ1cm)
+
+s1cmInts <- c(1, 3, 4)
+fitIQ1cm <- learnIQ1cm(object = fitIQ2, H1CMean = s1vars,A1 = bmiData$A1, s1cmInts = s1cmInts)
+
+fitIQ1cm$betaHat10
+fitIQ1cm$betaHat11
+plot(fitIQ1cm)
+
+fitIQ1var <- learnIQ1var(fitIQ1cm)
+fitIQ1var <- learnIQ1var(object = fitIQ1cm, method = "homo")
+
+fitIQ1var <- learnIQ1var(~ gender + race + parent_BMI +baseline_BMI + A1 * (parent_BMI), data = bmiData, treatName = "A1",intNames = "parent_BMI", method = "hetero", cmObject = fitIQ1cm)
+s1varInts <- c(3, 4)
+fitIQ1var <- learnIQ1var(object = fitIQ1cm, H1CVar = s1vars,s1sInts = s1varInts, method = "hetero")
+summary (fitIQ1var)
+
+
+fitIQ1 <- learnIQ1(mainObj = fitIQ1main, cmObj = fitIQ1cm,sigObj = fitIQ1var, dens = "nonpar")
+#A vector of estimated optimal first-stage treatments for patients in the study is returned ($optA1).
+
+
+h1 <- c(1, 1, 30, 35)
+h1main <- h1
+h1cm <- h1
+h1var <- h1
+optIQ1 <- IQ1(mainObj = fitIQ1main, cmObj = fitIQ1cm, sigObj = fitIQ1var,dens = "nonpar", h1main = h1main, h1cm = h1cm, h1sig = h1var)
+optIQ1
+
+
+
+h2 <- c(1, 30, 45)
+optIQ2 <- IQ2(fitIQ2, h2)
+optIQ2
+
+
+fitQ2 <- qLearnS2(H2 = s2vars, Y = y, A2 = bmiData$A2, s2ints = s2ints)
+fitQ2 <- qLearnS2(y ~ gender + parent_BMI + month4_BMI +A2 * (parent_BMI + month4_BMI), data = bmiData, treatName = "A2",intNames = c("parent_BMI", "month4_BMI"))
+
+
+fitQ1 <- qLearnS1(object = fitQ2, H1q = s1vars, A1 = bmiData$A1,s1ints = c(3, 4))
+fitQ1 <- qLearnS1(~gender + race + parent_BMI + baseline_BMI +A1 * (gender + parent_BMI), data = bmiData, treatName = "A1",intNames = c("gender", "parent_BMI"), qS2object = fitQ2)
+
+
+h1q <- c(1, 1, 30, 35)
+optQ1 <- qLearnQ1(fitQ1, h1q)
+optQ1
+
+summary (fitQ2)
+
+h2q <- c(1, 30, 45)
+optQ2 <- qLearnQ2 (fitQ2, h2q)
+optQ2
+
+
+estVal <- value(d1 = fitIQ1$optA1, d2 = fitIQ2$optA2, Y = y,A1 = bmiData$A1, A2 = bmiData$A2)
+estVal
+```
+
